@@ -53,22 +53,26 @@ backend/
 ### Installation
 
 1. **Create virtual environment**:
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 2. **Install dependencies**:
+
    ```bash
    pip install -r requirements.txt
    ```
 
 3. **Set up environment variables**:
+
    ```bash
    cp env.example .env
    ```
-   
+
    Edit `.env` with your API keys:
+
    ```
    GOOGLE_MAPS_API_KEY=your_google_maps_api_key
    OPENAI_API_KEY=your_openai_api_key
@@ -77,6 +81,7 @@ backend/
    ```
 
 4. **Start the server**:
+
    ```bash
    uvicorn main:app --reload --host 0.0.0.0 --port 8000
    ```
@@ -99,6 +104,7 @@ Once the backend is running, visit `http://localhost:8000/docs` for interactive 
 ### Example API Calls
 
 1. **Create a trip**:
+
    ```bash
    curl -X POST "http://localhost:8000/api/trips" \
         -H "Content-Type: application/json" \
