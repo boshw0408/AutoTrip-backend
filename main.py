@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 from contextlib import asynccontextmanager
 
-from routes import places, hotels, itinerary, trips, ai
+from routes import places, hotels, itinerary, trips, ai, data_aggregation
 from core.config import settings
 
 @asynccontextmanager
@@ -37,6 +37,7 @@ app.include_router(places.router, prefix="/api/places", tags=["places"])
 app.include_router(hotels.router, prefix="/api/hotels", tags=["hotels"])
 app.include_router(itinerary.router, prefix="/api/itinerary", tags=["itinerary"])
 app.include_router(ai.router, prefix="/api/ai", tags=["ai"])
+app.include_router(data_aggregation.router, prefix="/api/aggregation", tags=["data-aggregation"])
 
 @app.get("/")
 async def root():

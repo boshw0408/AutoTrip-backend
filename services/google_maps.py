@@ -47,7 +47,9 @@ class GoogleMapsService:
                     'price_level': place_details['result'].get('price_level'),
                     'types': place_details['result'].get('types', []),
                     'location': place_details['result']['geometry']['location'],
-                    'photos': [photo.get('photo_reference', '') for photo in place_details['result'].get('photos', [])]
+                    'photos': [photo.get('photo_reference', '') for photo in place_details['result'].get('photos', [])],
+                    'description': place_details['result'].get('name', ''),
+                    'source': 'google_maps'
                 })
             
             return places

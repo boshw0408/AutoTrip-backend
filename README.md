@@ -15,7 +15,6 @@ A FastAPI backend for the AutoTrip travel planning application with AI-powered i
 - **Framework**: FastAPI with async support
 - **Language**: Python 3.9+
 - **AI Integration**: LangChain + OpenAI GPT-3.5-turbo
-- **Database**: Firebase Firestore
 - **Caching**: Redis for API response caching
 - **APIs**: Google Maps, Yelp integration
 
@@ -36,8 +35,7 @@ backend/
 │   ├── google_maps.py
 │   └── yelp_api.py
 ├── core/               # Configuration
-│   ├── config.py
-│   └── firebase.py
+│   └── config.py
 └── main.py             # FastAPI application
 ```
 
@@ -48,7 +46,7 @@ backend/
 - Python 3.9+
 - Google Maps API key
 - OpenAI API key
-- Firebase project (optional for development)
+- Yelp API key
 
 ### Installation
 
@@ -76,7 +74,7 @@ backend/
    ```
    GOOGLE_MAPS_API_KEY=your_google_maps_api_key
    OPENAI_API_KEY=your_openai_api_key
-   FIREBASE_KEY={"type": "service_account", ...}
+   YELP_API_KEY=your_yelp_api_key
    REDIS_URL=redis://localhost:6379
    ```
 
@@ -136,11 +134,11 @@ Once the backend is running, visit `http://localhost:8000/docs` for interactive 
 
 ### Mock Data
 
-The application currently uses mock data for development. To integrate real APIs:
+The application uses real APIs with fallback to mock data. To integrate additional APIs:
 
 1. **Google Maps API**: Update `services/google_maps.py` with real API calls
-2. **Yelp API**: Implement restaurant search in `services/yelp_api.py`
-3. **Firebase**: Configure real Firebase project in `core/firebase.py`
+2. **Yelp API**: Already integrated in `services/yelp_api.py`
+3. **Data Aggregation**: Centralized in `services/data_aggregation.py`
 
 ### LangChain Integration
 

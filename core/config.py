@@ -8,8 +8,7 @@ class Settings(BaseSettings):
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     yelp_api_key: str = os.getenv("YELP_API_KEY", "")
     
-    # Database
-    firebase_key: str = os.getenv("FIREBASE_KEY", "")
+    # Cache
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
     
     # App Settings

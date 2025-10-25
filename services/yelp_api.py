@@ -44,7 +44,8 @@ class YelpAPIService:
                         'lng': business['coordinates']['longitude']
                     },
                     'photos': business.get('photos', []),
-                    'description': business.get('review_count', 0)
+                    'description': f"Restaurant with {business.get('review_count', 0)} reviews",
+                    'source': 'yelp'
                 })
             
             return restaurants
@@ -87,7 +88,8 @@ class YelpAPIService:
                         'lng': business['coordinates']['longitude']
                     },
                     'distance_from_center': 'N/A',
-                    'availability': True
+                    'availability': True,
+                    'source': 'yelp'
                 })
             
             return hotels
