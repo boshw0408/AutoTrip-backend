@@ -1,21 +1,41 @@
-from fastapi import APIRouter, HTTPException
-from typing import List
+from fastapi import APIRouter, HTTPException, Depends
+from typing import List, Optional
 from models.schemas import TripCreate, TripResponse, PlaceSearch, PlaceResponse
 from services.mock_data import MockDataService
 from services.google_maps import GoogleMapsService
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 import uuid
 from datetime import datetime
 
 router = APIRouter()
-mock_service = MockDataService()
-google_maps_service = GoogleMapsService()
 
-# Trip Planning Models
+# Dependency injection for services
+def get_google_maps_service() -> GoogleMapsService:
+    """Dependency to get Google Maps service instance"""
+    return GoogleMapsService()
+
+def get_mock_service() -> MockDataService:
+    """Dependency to get Mock Data service instance"""
+    return MockDataService()
+
+
+# Trip Planning Models with Validation
 class TripPlanRequest(BaseModel):
-    origin: str
-    destination: str
-    waypoints: List[str]
+    origin: str = Field(..., min_length=3, max_length=200, description="Starting location")
+    destination: str = Field(..., min_length=3, max_length=200, description="Ending location")
+    waypoints: List[str] = Field(default=[], max_items=23, description="Intermediate stops (max 23 for Google Maps)")
+    
+    @validator('waypoints')
+    def validate_waypoints(cls, v):
+        """Ensure waypoints are not empty strings"""
+        return [wp.strip() for wp in v if wp.strip()]
+    
+    @validator('destination')
+    def validate_different_locations(cls, v, values):
+        """Ensure origin and destination are different"""
+        if 'origin' in values and v.strip().lower() == values['origin'].strip().lower():
+            raise ValueError("Origin and destination must be different")
+        return v
 
 class LocationResponse(BaseModel):
     name: str
@@ -35,6 +55,8 @@ class TripPlanResponse(BaseModel):
     total_duration: str
     polyline: str
     segments: List[SegmentResponse]
+    waypoints_reordered: bool = Field(description="Whether waypoints were reordered for optimization")
+    original_waypoint_order: Optional[List[int]] = Field(None, description="Original waypoint indices in optimized order")
 
 class RouteVisualizationResponse(BaseModel):
     polyline: str
@@ -45,15 +67,23 @@ class TripSummaryResponse(BaseModel):
     total_distance: str
     total_duration: str
     location_count: int
-    estimated_cost: str = None
+    estimated_cost: Optional[str] = None
 
 class MapBoundsResponse(BaseModel):
     northeast: dict
     southwest: dict
     center: dict
 
+
+# ============================================
+# Basic Trip CRUD Operations (Stateless)
+# =================================
+
 @router.post("/", response_model=TripResponse)
-async def create_trip(trip: TripCreate):
+async def create_trip(
+    trip: TripCreate,
+    mock_service: MockDataService = Depends(get_mock_service)
+):
     """Create a new trip (stateless - no persistence)"""
     try:
         trip_id = str(uuid.uuid4())
@@ -73,17 +103,18 @@ async def create_trip(trip: TripCreate):
             "updated_at": datetime.now().isoformat()
         }
         
-        # Return trip data without persistence (stateless)
         return TripResponse(**trip_data)
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create trip: {str(e)}")
 
 @router.get("/{trip_id}", response_model=TripResponse)
-async def get_trip(trip_id: str):
+async def get_trip(
+    trip_id: str,
+    mock_service: MockDataService = Depends(get_mock_service)
+):
     """Get a specific trip by ID (stateless - returns mock data)"""
     try:
-        # Since we're stateless, return a mock trip
         mock_trip = {
             "id": trip_id,
             "location": "Paris, France",
@@ -104,17 +135,21 @@ async def get_trip(trip_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get trip: {str(e)}")
 
 @router.get("/", response_model=List[TripResponse])
-async def get_trips():
+async def get_trips(
+    mock_service: MockDataService = Depends(get_mock_service)
+):
     """Get all trips (stateless - returns empty list)"""
     try:
-        # Since we're stateless, return empty list
         return []
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get trips: {str(e)}")
 
 @router.put("/{trip_id}", response_model=TripResponse)
-async def update_trip(trip_id: str, trip: TripCreate):
+async def update_trip(
+    trip_id: str,
+    trip: TripCreate,
+    mock_service: MockDataService = Depends(get_mock_service)
+):
     """Update an existing trip (stateless - returns updated mock data)"""
     try:
         duration = (trip.end_date - trip.start_date).days
@@ -139,20 +174,41 @@ async def update_trip(trip_id: str, trip: TripCreate):
         raise HTTPException(status_code=500, detail=f"Failed to update trip: {str(e)}")
 
 @router.delete("/{trip_id}")
-async def delete_trip(trip_id: str):
+async def delete_trip(
+    trip_id: str,
+    mock_service: MockDataService = Depends(get_mock_service)
+):
     """Delete a trip (stateless - always succeeds)"""
     try:
         return {"message": "Trip deleted successfully (stateless operation)"}
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete trip: {str(e)}")
 
-# Enhanced Trip Planning Endpoints
+
+# ============================================
+# Enhanced Trip Planning Endpoints (Google Maps Integration)
+# ============================================
 
 @router.post("/plan", response_model=TripPlanResponse)
-async def plan_trip(request: TripPlanRequest):
-    """Plan a complete trip with optimized waypoint ordering"""
+async def plan_trip(
+    request: TripPlanRequest,
+    google_maps_service: GoogleMapsService = Depends(get_google_maps_service)
+):
+    """
+    Plan a complete trip with optimized waypoint ordering.
+    
+    Google Maps will automatically reorder waypoints to find the shortest/fastest route.
+    The response includes the optimized order and detailed segments.
+    """
     try:
+        # Validate that we have at least an origin and destination
+        if not request.origin or not request.destination:
+            raise HTTPException(
+                status_code=400,
+                detail="Origin and destination are required"
+            )
+        
+        # Call Google Maps service with optimization enabled
         trip_plan = await google_maps_service.plan_trip(
             origin=request.origin,
             destination=request.destination,
@@ -160,9 +216,12 @@ async def plan_trip(request: TripPlanRequest):
         )
         
         if not trip_plan:
-            raise HTTPException(status_code=400, detail="Failed to plan trip")
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to plan trip. Please check that all locations are valid."
+            )
         
-        # Convert to response format
+        # Convert dataclasses to Pydantic models for response
         optimized_order = [
             LocationResponse(
                 name=loc.name,
@@ -191,21 +250,44 @@ async def plan_trip(request: TripPlanRequest):
             ) for seg in trip_plan.segments
         ]
         
+        # Check if waypoints were reordered
+        waypoints_reordered = len(request.waypoints) > 1
+        
         return TripPlanResponse(
             optimized_order=optimized_order,
             total_distance=trip_plan.total_distance,
             total_duration=trip_plan.total_duration,
             polyline=trip_plan.polyline,
-            segments=segments
+            segments=segments,
+            waypoints_reordered=waypoints_reordered
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to plan trip: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to plan trip: {str(e)}"
+        )
 
 @router.post("/route-visualization", response_model=RouteVisualizationResponse)
-async def get_route_visualization(request: TripPlanRequest):
-    """Get route visualization data for map display"""
+async def get_route_visualization(
+    request: TripPlanRequest,
+    google_maps_service: GoogleMapsService = Depends(get_google_maps_service)
+):
+    """
+    Get route visualization data for map display.
+    
+    Returns polyline for drawing the route on a map, markers for all locations,
+    and bounds for setting the map viewport.
+    """
     try:
+        if not request.origin or not request.destination:
+            raise HTTPException(
+                status_code=400,
+                detail="Origin and destination are required"
+            )
+        
         route_viz = await google_maps_service.get_route_polyline(
             origin=request.origin,
             destination=request.destination,
@@ -213,7 +295,10 @@ async def get_route_visualization(request: TripPlanRequest):
         )
         
         if not route_viz:
-            raise HTTPException(status_code=400, detail="Failed to get route visualization")
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to get route visualization. Please check that all locations are valid."
+            )
         
         markers = [
             LocationResponse(
@@ -230,38 +315,41 @@ async def get_route_visualization(request: TripPlanRequest):
             bounds=route_viz.bounds
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get route visualization: {str(e)}")
-
-@router.post("/summary", response_model=TripSummaryResponse)
-async def get_trip_summary(request: TripPlanRequest):
-    """Calculate trip summary statistics"""
-    try:
-        locations = [request.origin] + request.waypoints + [request.destination]
-        summary = await google_maps_service.calculate_trip_summary(locations)
-        
-        if not summary:
-            raise HTTPException(status_code=400, detail="Failed to calculate trip summary")
-        
-        return TripSummaryResponse(
-            total_distance=summary.total_distance,
-            total_duration=summary.total_duration,
-            location_count=summary.location_count,
-            estimated_cost=summary.estimated_cost
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get route visualization: {str(e)}"
         )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to calculate trip summary: {str(e)}")
 
 @router.post("/map-bounds", response_model=MapBoundsResponse)
-async def get_map_bounds(request: TripPlanRequest):
-    """Get map bounds for all locations"""
+async def get_map_bounds(
+    request: TripPlanRequest,
+    google_maps_service: GoogleMapsService = Depends(get_google_maps_service)
+):
+    """
+    Get map bounds for all locations.
+    
+    Returns the bounding box coordinates that contain all locations in the trip.
+    Useful for setting the initial map viewport.
+    """
     try:
         locations = [request.origin] + request.waypoints + [request.destination]
+        
+        if not locations:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one location is required"
+            )
+        
         bounds = await google_maps_service.get_map_bounds(locations)
         
         if not bounds:
-            raise HTTPException(status_code=400, detail="Failed to get map bounds")
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to get map bounds. Please check that all locations are valid."
+            )
         
         return MapBoundsResponse(
             northeast=bounds.northeast,
@@ -269,5 +357,26 @@ async def get_map_bounds(request: TripPlanRequest):
             center=bounds.center
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get map bounds: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get map bounds: {str(e)}"
+        )
+
+
+# ============================================
+# Utility Endpoint
+# ============================================
+
+@router.get("/health")
+async def health_check(
+    google_maps_service: GoogleMapsService = Depends(get_google_maps_service)
+):
+    """Check if the trips API and Google Maps service are working"""
+    return {
+        "status": "healthy",
+        "google_maps_initialized": google_maps_service.client is not None,
+        "timestamp": datetime.now().isoformat()
+    }
