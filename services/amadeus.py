@@ -22,7 +22,7 @@ class AmadeusService:
         """Get OAuth access token from Amadeus API"""
         # Check if we have a valid token
         if self.access_token and self.token_expiry:
-            if datetime.now() < self.token_expiry:
+            if datetime.now().timestamp() < self.token_expiry:
                 return self.access_token
         
         # Request new token

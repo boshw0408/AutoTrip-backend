@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from models.schemas import TripCreate, TripResponse, PlaceSearch, PlaceResponse
-from services.mock_data import MockDataService
 from services.google_maps import GoogleMapsService
 from pydantic import BaseModel, Field, validator
 import uuid
@@ -13,10 +12,6 @@ router = APIRouter()
 def get_google_maps_service() -> GoogleMapsService:
     """Dependency to get Google Maps service instance"""
     return GoogleMapsService()
-
-def get_mock_service() -> MockDataService:
-    """Dependency to get Mock Data service instance"""
-    return MockDataService()
 
 
 # Trip Planning Models with Validation
@@ -81,8 +76,7 @@ class MapBoundsResponse(BaseModel):
 
 @router.post("/", response_model=TripResponse)
 async def create_trip(
-    trip: TripCreate,
-    mock_service: MockDataService = Depends(get_mock_service)
+    trip: TripCreate
 ):
     """Create a new trip (stateless - no persistence)"""
     try:
@@ -111,8 +105,7 @@ async def create_trip(
 
 @router.get("/{trip_id}", response_model=TripResponse)
 async def get_trip(
-    trip_id: str,
-    mock_service: MockDataService = Depends(get_mock_service)
+    trip_id: str
 ):
     """Get a specific trip by ID (stateless - returns mock data)"""
     try:
@@ -136,9 +129,7 @@ async def get_trip(
         raise HTTPException(status_code=500, detail=f"Failed to get trip: {str(e)}")
 
 @router.get("/", response_model=List[TripResponse])
-async def get_trips(
-    mock_service: MockDataService = Depends(get_mock_service)
-):
+async def get_trips():
     """Get all trips (stateless - returns empty list)"""
     try:
         return []
@@ -148,8 +139,7 @@ async def get_trips(
 @router.put("/{trip_id}", response_model=TripResponse)
 async def update_trip(
     trip_id: str,
-    trip: TripCreate,
-    mock_service: MockDataService = Depends(get_mock_service)
+    trip: TripCreate
 ):
     """Update an existing trip (stateless - returns updated mock data)"""
     try:
@@ -177,8 +167,7 @@ async def update_trip(
 
 @router.delete("/{trip_id}")
 async def delete_trip(
-    trip_id: str,
-    mock_service: MockDataService = Depends(get_mock_service)
+    trip_id: str
 ):
     """Delete a trip (stateless - always succeeds)"""
     try:

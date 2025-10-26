@@ -2,16 +2,15 @@ from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from typing import List
 from models.schemas import ItineraryGenerate, ItineraryResponse, RouteRequest, RouteResponse
-from services.mock_data import MockDataService
 from services.llm_service import LLMService
 from services.data_aggregation import data_aggregation_service
 from services.pdf_service import PDFService
 from services.ical_service import ICalService
 import uuid
+import random
 from datetime import datetime, timedelta
 
 router = APIRouter()
-mock_service = MockDataService()
 llm_service = LLMService()
 pdf_service = PDFService()
 ical_service = ICalService()
@@ -35,6 +34,23 @@ async def generate_itinerary(request: ItineraryGenerate):
             duration=duration
         )
         
+        # Build user preferences including selected hotel and remaining budget
+        user_preferences = ""
+        if request.selected_hotel:
+            hotel_name = request.selected_hotel.get("name", "")
+            hotel_address = request.selected_hotel.get("address", "")
+            hotel_price = request.selected_hotel.get("price_per_night", 0)
+            
+            # Calculate remaining budget after hotel cost
+            hotel_total_cost = hotel_price * duration
+            remaining_budget = request.budget - hotel_total_cost
+            
+            user_preferences = f"""The user has selected hotel: {hotel_name} located at {hotel_address} (${hotel_price}/night).
+Include this hotel in the itinerary as the accommodation base.
+IMPORTANT: The hotel cost is ${hotel_total_cost:.2f} total (${hotel_price}/night × {duration} nights).
+REMAINING BUDGET for meals, attractions, and transport: ${remaining_budget:.2f}.
+Allocate this remaining budget wisely across meals, attractions, and transport."""
+        
         # For 2-day trips, use the comprehensive TravelAI itinerary generator
         if duration == 2:
             comprehensive_itinerary = await llm_service.generate_comprehensive_2day_itinerary(
@@ -44,7 +60,7 @@ async def generate_itinerary(request: ItineraryGenerate):
                 interests=request.interests,
                 budget=request.budget,
                 travelers=request.travelers,
-                user_preferences=""
+                user_preferences=user_preferences
             )
             
             # Convert comprehensive itinerary to ItineraryResponse format
@@ -163,44 +179,23 @@ async def generate_itinerary(request: ItineraryGenerate):
     except Exception as e:
         # Fallback to mock data if aggregation fails
         try:
-            duration = (request.end_date - request.start_date).days
-            itinerary_data = mock_service.generate_mock_itinerary(
-                location=request.location,
-                duration=duration,
-                interests=request.interests,
-                budget=request.budget,
-                travelers=request.travelers
-            )
-            
-            summary = await llm_service.summarize_itinerary(itinerary_data)
-            
-            itinerary_response = {
-                "id": str(uuid.uuid4()),
-                "location": request.location,
-                "origin": request.origin,
-                "duration": duration,
-                "days": itinerary_data["days"],
-                "summary": summary,
-                "total_estimated_cost": itinerary_data.get("total_cost", 0),
-                "data_sources": "fallback_mock_data"
-            }
-            
-            return ItineraryResponse(**itinerary_response)
+            # Fallback disabled - mock data removed
+            raise HTTPException(status_code=500, detail=f"Failed to generate itinerary: {str(e)}")
             
         except Exception as fallback_error:
-            raise HTTPException(status_code=500, detail=f"Failed to generate itinerary: {str(e)}. Fallback also failed: {str(fallback_error)}")
+            raise HTTPException(status_code=500, detail=f"Failed to generate itinerary: {str(e)}")
 
 @router.post("/routes", response_model=RouteResponse)
 async def get_route(request: RouteRequest):
     """Get optimized route between locations"""
     try:
-        # For now, return mock route data
-        route_data = mock_service.get_mock_route(
-            origin=request.origin,
-            destination=request.destination,
-            waypoints=request.waypoints,
-            mode=request.mode
-        )
+        # Mock data removed - return empty route
+        route_data = {
+            "distance": "0 km",
+            "duration": "0 mins",
+            "polyline": "",
+            "steps": []
+        }
         
         return RouteResponse(**route_data)
         

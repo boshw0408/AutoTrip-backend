@@ -98,16 +98,19 @@ Here is the aggregated data from multiple sources (Google Maps, Yelp, Instagram)
 ===========================
 🏨 STEP 4: Hotel Selection
 ===========================
-- Pick 1 hotel near midpoint of the route.
-- Stay within user's remaining budget ± $100.
-- Prefer hotels rated ≥ 3.5/5 with Wi-Fi, parking, breakfast.
-- If no option fits, expand search radius by 10km increments.
+- Use the hotel provided in user preferences. The user has already selected a hotel.
+- Include this hotel in the itinerary as the base accommodation.
+- Reference the hotel name, location, and price in your recommendations.
+- Do NOT search for other hotels - use only the one the user selected.
 
 ===========================
 💰 STEP 5: Budget Allocation
 ===========================
-- Split total budget into: {{hotel, meals, attractions, transport}}.
-- Suggest replacements if estimated total exceeds budget by >10%.
+- IMPORTANT: The hotel has already been paid for by the user. Focus allocation on remaining budget.
+- Allocate the REMAINING BUDGET provided in user preferences across meals, attractions, and transport.
+- If remaining budget is mentioned in user preferences, use that amount. Otherwise, estimate based on typical costs.
+- Ensure total spending on meals + attractions + transport stays within the remaining budget.
+- Suggest replacements if estimated total exceeds remaining budget by >10%.
 
 ===========================
 🧩 STEP 6: Final Itinerary Output
@@ -175,7 +178,7 @@ CRITICAL INSTRUCTIONS
 4. Each activity must have: time, activity name, type, duration, cost, location, description.
 5. Ensure the itinerary is realistic and achievable.
 6. Prioritize trending/Instagram restaurants when available.
-7. Choose hotels within budget and near the route midpoint.
+7. Use the hotel from user preferences - do not select a different hotel.
 8. CRITICAL: Do NOT select the same restaurant or attraction more than once across the entire 2-day itinerary. Each place must be unique.
 9. Vary restaurants and attractions - no duplicates allowed even if they appear multiple times in the data.
 

@@ -69,6 +69,7 @@ class HotelSearchRequest(BaseModel):
     travelers: int
     budget: float
     interests: List[str] = []
+    starting_location: Optional[str] = None  # Optional starting location for midpoint calculation
 
 class HotelSearchResponse(BaseModel):
     id: str
@@ -152,6 +153,7 @@ class ItineraryGenerate(BaseModel):
     budget: float
     travelers: int
     interests: List[str]
+    selected_hotel: Optional[Dict[str, Any]] = None  # Selected hotel information
 
 class ItineraryResponse(BaseModel):
     id: str
