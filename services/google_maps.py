@@ -78,8 +78,20 @@ class GoogleMapsService:
             for place in places_result.get('results', []):
                 place_details = self.client.place(
                     place_id=place['place_id'],
-                    fields=['name', 'formatted_address', 'rating', 'price_level', 'types', 'geometry', 'photos']
+                    fields=['name', 'formatted_address', 'rating', 'price_level', 'type', 'geometry', 'photo']
                 )
+                
+                # Get types from the original search result since 'type' field returns array
+                place_types = place.get('types', [])
+                
+                # Get photo references (handle both singular and list formats)
+                photo_refs = []
+                photo_data = place_details['result'].get('photo')
+                if photo_data:
+                    if isinstance(photo_data, list):
+                        photo_refs = [photo.get('photo_reference', '') for photo in photo_data]
+                    else:
+                        photo_refs = [photo_data.get('photo_reference', '')]
                 
                 places.append({
                     'id': place['place_id'],
@@ -87,9 +99,9 @@ class GoogleMapsService:
                     'address': place_details['result'].get('formatted_address', ''),
                     'rating': place_details['result'].get('rating', 0),
                     'price_level': place_details['result'].get('price_level'),
-                    'types': place_details['result'].get('types', []),
+                    'types': place_types,
                     'location': place_details['result']['geometry']['location'],
-                    'photos': [photo.get('photo_reference', '') for photo in place_details['result'].get('photos', [])],
+                    'photos': photo_refs,
                     'description': place_details['result'].get('name', ''),
                     'source': 'google_maps'
                 })

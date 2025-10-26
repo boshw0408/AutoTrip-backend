@@ -91,6 +91,7 @@ async def create_trip(
         
         trip_data = {
             "id": trip_id,
+            "origin": trip.origin,
             "location": trip.location,
             "start_date": trip.start_date.isoformat(),
             "end_date": trip.end_date.isoformat(),
@@ -156,6 +157,7 @@ async def update_trip(
         
         update_data = {
             "id": trip_id,
+            "origin": trip.origin,
             "location": trip.location,
             "start_date": trip.start_date.isoformat(),
             "end_date": trip.end_date.isoformat(),

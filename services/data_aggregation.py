@@ -6,6 +6,7 @@ import logging
 
 from services.google_maps import GoogleMapsService
 from services.yelp_api import YelpAPIService
+from services.instagram_api import InstagramAPIService
 from services.llm_service import LLMService
 from core.config import settings
 
@@ -21,6 +22,7 @@ class DataAggregationService:
     def __init__(self):
         self.google_maps = GoogleMapsService()
         self.yelp = YelpAPIService()
+        self.instagram = InstagramAPIService()
         self.llm_service = LLMService()
         
         # Cache for storing aggregated data (in-memory for now, will add Redis later)
@@ -168,9 +170,9 @@ class DataAggregationService:
         
         tasks = []
         
-        # Add Yelp restaurant search
-        if self.yelp.api_key:
-            tasks.append(self.yelp.search_restaurants(location))
+        # Add Instagram trending restaurant search (focused on San Francisco)
+        if self.instagram.access_token and self.instagram.business_account_id:
+            tasks.append(self.instagram.search_trending_restaurants(location))
         
         # Add Google Maps restaurant search
         if self.google_maps.client:
@@ -312,12 +314,27 @@ class DataAggregationService:
         """Merge attraction data from different sources and deduplicate"""
         all_attractions = []
         seen_names = set()
+        seen_addresses = set()
         
         for attraction_list in attraction_lists:
             for attraction in attraction_list:
                 attraction_name = attraction.get("name", "").lower().strip()
-                if attraction_name and attraction_name not in seen_names:
+                # More aggressive deduplication: check both name and location
+                attraction_address = attraction.get("address", "").lower().strip()
+                
+                # Skip if duplicate name OR (same location within 100m)
+                is_duplicate = False
+                if attraction_name in seen_names:
+                    is_duplicate = True
+                
+                # Skip if we've seen this exact address before
+                if attraction_address and attraction_address in seen_addresses:
+                    is_duplicate = True
+                
+                if not is_duplicate and attraction_name:
                     seen_names.add(attraction_name)
+                    if attraction_address:
+                        seen_addresses.add(attraction_address)
                     
                     normalized_attraction = {
                         "id": attraction.get("id", f"attraction_{len(all_attractions)}"),
@@ -340,12 +357,27 @@ class DataAggregationService:
         """Merge restaurant data from different sources and deduplicate"""
         all_restaurants = []
         seen_names = set()
+        seen_addresses = set()
         
         for restaurant_list in restaurant_lists:
             for restaurant in restaurant_list:
                 restaurant_name = restaurant.get("name", "").lower().strip()
-                if restaurant_name and restaurant_name not in seen_names:
+                # More aggressive deduplication: check both name and location
+                restaurant_address = restaurant.get("address", "").lower().strip()
+                
+                # Skip if duplicate name OR (same location within 100m)
+                is_duplicate = False
+                if restaurant_name in seen_names:
+                    is_duplicate = True
+                
+                # Skip if we've seen this exact address before
+                if restaurant_address and restaurant_address in seen_addresses:
+                    is_duplicate = True
+                
+                if not is_duplicate and restaurant_name:
                     seen_names.add(restaurant_name)
+                    if restaurant_address:
+                        seen_addresses.add(restaurant_address)
                     
                     normalized_restaurant = {
                         "id": restaurant.get("id", f"restaurant_{len(all_restaurants)}"),

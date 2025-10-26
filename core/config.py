@@ -7,8 +7,14 @@ class Settings(BaseSettings):
     google_maps_api_key: str = os.getenv("GOOGLE_MAPS_API_KEY", "")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     yelp_api_key: str = os.getenv("YELP_API_KEY", "")
+<<<<<<< Updated upstream
     amadeus_api_key: str = os.getenv("AMADEUS_API_KEY", "")
     amadeus_api_secret: str = os.getenv("AMADEUS_API_SECRET", "")
+=======
+    instagram_access_token: str = os.getenv("INSTAGRAM_ACCESS_TOKEN", "")
+    instagram_page_id: str = os.getenv("INSTAGRAM_PAGE_ID", "")
+    instagram_business_account_id: str = os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID", "")
+>>>>>>> Stashed changes
     
     # Cache
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")

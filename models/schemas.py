@@ -20,6 +20,7 @@ class InterestType(str, Enum):
     ART_MUSEUMS = "Art & Museums"
 
 class TripCreate(BaseModel):
+    origin: Optional[str] = None
     location: str
     start_date: date
     end_date: date
@@ -30,6 +31,7 @@ class TripCreate(BaseModel):
 
 class TripResponse(BaseModel):
     id: str
+    origin: Optional[str] = None
     location: str
     start_date: date
     end_date: date
@@ -143,6 +145,7 @@ class ItineraryDay(BaseModel):
     items: List[ItineraryItem]
 
 class ItineraryGenerate(BaseModel):
+    origin: Optional[str] = None
     location: str
     start_date: date
     end_date: date
@@ -153,6 +156,7 @@ class ItineraryGenerate(BaseModel):
 class ItineraryResponse(BaseModel):
     id: str
     location: str
+    origin: Optional[str] = None
     duration: int
     days: List[ItineraryDay]
     summary: Optional[str]

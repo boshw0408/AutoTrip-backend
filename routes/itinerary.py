@@ -1,55 +1,164 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
+from fastapi.responses import StreamingResponse
 from typing import List
 from models.schemas import ItineraryGenerate, ItineraryResponse, RouteRequest, RouteResponse
 from services.mock_data import MockDataService
 from services.llm_service import LLMService
 from services.data_aggregation import data_aggregation_service
+from services.pdf_service import PDFService
+from services.ical_service import ICalService
 import uuid
 from datetime import datetime, timedelta
 
 router = APIRouter()
 mock_service = MockDataService()
 llm_service = LLMService()
+pdf_service = PDFService()
+ical_service = ICalService()
 
 @router.post("/generate", response_model=ItineraryResponse)
 async def generate_itinerary(request: ItineraryGenerate):
-    """Generate a personalized itinerary for a trip using Data Aggregation Layer"""
+    """Generate a personalized itinerary for a trip using Data Aggregation Layer and TravelAI"""
     try:
         # Calculate duration
         duration = (request.end_date - request.start_date).days
         
+        # Use origin if provided, otherwise default to location
+        search_location = request.origin if request.origin else request.location
+        
         # Get comprehensive location data using Data Aggregation Layer
         location_data = await data_aggregation_service.get_comprehensive_location_data(
-            location=request.location,
+            location=search_location,
             interests=request.interests,
             budget=request.budget,
             travelers=request.travelers,
             duration=duration
         )
         
-        # Generate itinerary using aggregated data
-        itinerary_data = await _generate_itinerary_from_aggregated_data(
-            location_data=location_data,
-            duration=duration,
-            interests=request.interests,
-            budget=request.budget,
-            travelers=request.travelers
-        )
+        # For 2-day trips, use the comprehensive TravelAI itinerary generator
+        if duration == 2:
+            comprehensive_itinerary = await llm_service.generate_comprehensive_2day_itinerary(
+                aggregated_data=location_data,
+                start_location=request.origin or request.location,
+                destination=request.location,
+                interests=request.interests,
+                budget=request.budget,
+                travelers=request.travelers,
+                user_preferences=""
+            )
+            
+            # Convert comprehensive itinerary to ItineraryResponse format
+            itinerary_days = []
+            
+            # Track selected places to prevent duplicates
+            selected_places = set()
+            
+            # Process Day 1
+            day1_items = []
+            for item in comprehensive_itinerary.get("day1", []):
+                activity_name = item.get("activity", "").lower().strip()
+                
+                # Skip if we've already selected this place
+                if activity_name in selected_places:
+                    print(f"⚠️ Skipping duplicate: {item.get('activity')}")
+                    continue
+                
+                selected_places.add(activity_name)
+                
+                day1_items.append({
+                    "id": f"day1_{len(day1_items)}",
+                    "time": item.get("time", ""),
+                    "title": item.get("activity", ""),
+                    "description": item.get("description", ""),
+                    "location": item.get("location", ""),
+                    "duration": item.get("duration", ""),
+                    "type": item.get("type", "activity"),
+                    "rating": None,
+                    "cost": item.get("cost", 0)
+                })
+            
+            itinerary_days.append({
+                "day": 1,
+                "date": request.start_date.strftime("%Y-%m-%d"),
+                "items": day1_items
+            })
+            
+            # Process Day 2
+            day2_items = []
+            for item in comprehensive_itinerary.get("day2", []):
+                activity_name = item.get("activity", "").lower().strip()
+                
+                # Skip if we've already selected this place
+                if activity_name in selected_places:
+                    print(f"⚠️ Skipping duplicate: {item.get('activity')}")
+                    continue
+                
+                selected_places.add(activity_name)
+                
+                day2_items.append({
+                    "id": f"day2_{len(day2_items)}",
+                    "time": item.get("time", ""),
+                    "title": item.get("activity", ""),
+                    "description": item.get("description", ""),
+                    "location": item.get("location", ""),
+                    "duration": item.get("duration", ""),
+                    "type": item.get("type", "activity"),
+                    "rating": None,
+                    "cost": item.get("cost", 0)
+                })
+            
+            itinerary_days.append({
+                "day": 2,
+                "date": (request.start_date + timedelta(days=1)).strftime("%Y-%m-%d"),
+                "items": day2_items
+            })
+            
+            # Get summary from comprehensive itinerary
+            summary = comprehensive_itinerary.get("summary", "")
+            
+            # Calculate total cost from budget breakdown
+            budget_breakdown = comprehensive_itinerary.get("budget_breakdown", {})
+            total_cost = budget_breakdown.get("total", request.budget)
+            
+            itinerary_response = {
+                "id": str(uuid.uuid4()),
+                "location": request.location,
+                "origin": request.origin,
+                "duration": duration,
+                "days": itinerary_days,
+                "summary": summary,
+                "total_estimated_cost": total_cost * request.travelers,
+                "data_sources": location_data.get("aggregated_at", "unknown")
+            }
+            
+            return ItineraryResponse(**itinerary_response)
         
-        # Generate AI summary using LangChain
-        summary = await llm_service.summarize_itinerary(itinerary_data)
-        
-        itinerary_response = {
-            "id": str(uuid.uuid4()),
-            "location": request.location,
-            "duration": duration,
-            "days": itinerary_data["days"],
-            "summary": summary,
-            "total_estimated_cost": itinerary_data.get("total_cost", 0),
-            "data_sources": location_data.get("aggregated_at", "unknown")
-        }
-        
-        return ItineraryResponse(**itinerary_response)
+        # For trips longer than 2 days, use the traditional method
+        else:
+            # Generate itinerary using aggregated data
+            itinerary_data = await _generate_itinerary_from_aggregated_data(
+                location_data=location_data,
+                duration=duration,
+                interests=request.interests,
+                budget=request.budget,
+                travelers=request.travelers
+            )
+            
+            # Generate AI summary using LangChain
+            summary = await llm_service.summarize_itinerary(itinerary_data)
+            
+            itinerary_response = {
+                "id": str(uuid.uuid4()),
+                "location": request.location,
+                "origin": request.origin,
+                "duration": duration,
+                "days": itinerary_data["days"],
+                "summary": summary,
+                "total_estimated_cost": itinerary_data.get("total_cost", 0),
+                "data_sources": location_data.get("aggregated_at", "unknown")
+            }
+            
+            return ItineraryResponse(**itinerary_response)
         
     except Exception as e:
         # Fallback to mock data if aggregation fails
@@ -68,6 +177,7 @@ async def generate_itinerary(request: ItineraryGenerate):
             itinerary_response = {
                 "id": str(uuid.uuid4()),
                 "location": request.location,
+                "origin": request.origin,
                 "duration": duration,
                 "days": itinerary_data["days"],
                 "summary": summary,
@@ -140,6 +250,62 @@ async def get_itinerary_templates():
             }
         ]
     }
+
+@router.post("/export-pdf")
+async def export_itinerary_pdf(itinerary: ItineraryResponse):
+    """Export itinerary as PDF"""
+    try:
+        # Convert itinerary to dict
+        itinerary_dict = itinerary.dict()
+        
+        # Generate PDF
+        pdf_buffer = pdf_service.generate_itinerary_pdf(itinerary_dict)
+        
+        # Create filename
+        location = itinerary.location.replace(" ", "_")
+        filename = f"itinerary_{location}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        
+        # Use Response with proper headers
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "application/pdf"
+        }
+        
+        return Response(
+            content=pdf_buffer.read(),
+            media_type="application/pdf",
+            headers=headers
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating PDF: {str(e)}")
+
+@router.post("/export-calendar")
+async def export_itinerary_calendar(itinerary: ItineraryResponse):
+    """Export itinerary as iCalendar (.ics) file"""
+    try:
+        # Convert itinerary to dict
+        itinerary_dict = itinerary.dict()
+        
+        # Generate iCal content
+        ical_content = ical_service.generate_ical_from_itinerary(itinerary_dict)
+        
+        # Create filename
+        location = itinerary.location.replace(" ", "_")
+        filename = f"itinerary_{location}_{datetime.now().strftime('%Y%m%d')}.ics"
+        
+        # Return iCal file
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "text/calendar"
+        }
+        
+        return Response(
+            content=ical_content,
+            media_type="text/calendar",
+            headers=headers
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating calendar: {str(e)}")
 
 async def _generate_itinerary_from_aggregated_data(
     location_data: dict,
