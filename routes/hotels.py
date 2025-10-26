@@ -1,34 +1,37 @@
- from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from datetime import date
-from schemas import (
+from models.schemas import (
     HotelSearchRequest, 
     HotelSearchResponse, 
     HotelComparisonRequest,
     HotelComparisonResponse,
     BudgetBreakdownResponse
 )
-from amadeus_service import amadeus_service
+from services.amadeus import amadeus_service
+from services.mock_data import MockDataService
 import logging
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+mock_data_service = MockDataService()
 
 
 @router.post("/search", response_model=List[dict])
 async def search_hotels(search_request: HotelSearchRequest):
     """
     Search for hotels using Amadeus API - returns raw Amadeus data
+    Falls back to mock data if Amadeus API fails
     """
     try:
         # Get city code from destination
         city_code = amadeus_service.get_city_code(search_request.destination)
         
         if not city_code:
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Could not find city code for destination: {search_request.destination}"
-            )
+            logger.warning(f"Could not find city code for {search_request.destination}, using mock data")
+            # Fallback to mock data
+            mock_hotels = mock_data_service.get_mock_hotels(search_request.destination)
+            return [hotel.dict() for hotel in mock_hotels]
         
         # Search for hotels in the city
         hotels = amadeus_service.search_hotels_by_city(
@@ -40,7 +43,10 @@ async def search_hotels(search_request: HotelSearchRequest):
         )
         
         if not hotels:
-            return []
+            logger.warning(f"No hotels found via Amadeus for {search_request.destination}, using mock data")
+            # Fallback to mock data
+            mock_hotels = mock_data_service.get_mock_hotels(search_request.destination)
+            return [hotel.dict() for hotel in mock_hotels]
         
         # Get hotel IDs
         hotel_ids = [hotel.get("hotelId") for hotel in hotels if hotel.get("hotelId")]
@@ -60,8 +66,14 @@ async def search_hotels(search_request: HotelSearchRequest):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to search hotels: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to search hotels: {str(e)}")
+        logger.error(f"Failed to search hotels: {str(e)}, falling back to mock data")
+        # Fallback to mock data on any error
+        try:
+            mock_hotels = mock_data_service.get_mock_hotels(search_request.destination)
+            return [hotel.dict() for hotel in mock_hotels]
+        except Exception as mock_error:
+            logger.error(f"Failed to get mock hotels: {str(mock_error)}")
+            raise HTTPException(status_code=500, detail=f"Failed to search hotels: {str(e)}")
 
 
 @router.get("/{hotel_id}")
