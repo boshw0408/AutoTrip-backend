@@ -8,8 +8,10 @@ from services.pdf_service import PDFService
 from services.ical_service import ICalService
 import uuid
 import random
+import logging
 from datetime import datetime, timedelta
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 llm_service = LLMService()
 pdf_service = PDFService()
@@ -46,10 +48,14 @@ async def generate_itinerary(request: ItineraryGenerate):
             remaining_budget = request.budget - hotel_total_cost
             
             user_preferences = f"""The user has selected hotel: {hotel_name} located at {hotel_address} (${hotel_price}/night).
-Include this hotel in the itinerary as the accommodation base.
+CRITICAL: You MUST include this exact hotel in the itinerary as the accommodation base. Do NOT choose a different hotel.
 IMPORTANT: The hotel cost is ${hotel_total_cost:.2f} total (${hotel_price}/night × {duration} nights).
 REMAINING BUDGET for meals, attractions, and transport: ${remaining_budget:.2f}.
 Allocate this remaining budget wisely across meals, attractions, and transport."""
+            
+            logger.info(f"Selected hotel: {hotel_name}, remaining budget: ${remaining_budget:.2f}")
+        else:
+            logger.info("No hotel selected")
         
         # For 2-day trips, use the comprehensive TravelAI itinerary generator
         if duration == 2:

@@ -98,10 +98,13 @@ Here is the aggregated data from multiple sources (Google Maps, Yelp, Instagram)
 ===========================
 🏨 STEP 4: Hotel Selection
 ===========================
-- Use the hotel provided in user preferences. The user has already selected a hotel.
-- Include this hotel in the itinerary as the base accommodation.
+- CRITICAL: Look for "The user has selected hotel:" in the user preferences section above.
+- If a hotel is mentioned in user preferences, you MUST use THAT EXACT HOTEL NAME and address.
+- Add a "hotel" type activity for checking in to this specific hotel (usually in the evening of Day 1).
+- Add a "hotel" type activity for checking out from this hotel (usually in the morning of Day 2).
 - Reference the hotel name, location, and price in your recommendations.
-- Do NOT search for other hotels - use only the one the user selected.
+- Do NOT search for other hotels - use ONLY the one specified in user preferences.
+- If NO hotel is mentioned in user preferences, skip hotel activities.
 
 ===========================
 💰 STEP 5: Budget Allocation
