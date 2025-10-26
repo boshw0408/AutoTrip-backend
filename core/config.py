@@ -8,8 +8,14 @@ class Settings(BaseSettings):
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     yelp_api_key: str = os.getenv("YELP_API_KEY", "")
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     amadeus_api_key: str = os.getenv("AMADEUS_API_KEY", "")
     amadeus_api_secret: str = os.getenv("AMADEUS_API_SECRET", "")
+=======
+    instagram_access_token: str = os.getenv("INSTAGRAM_ACCESS_TOKEN", "")
+    instagram_page_id: str = os.getenv("INSTAGRAM_PAGE_ID", "")
+    instagram_business_account_id: str = os.getenv("INSTAGRAM_BUSINESS_ACCOUNT_ID", "")
+>>>>>>> Stashed changes
 =======
     instagram_access_token: str = os.getenv("INSTAGRAM_ACCESS_TOKEN", "")
     instagram_page_id: str = os.getenv("INSTAGRAM_PAGE_ID", "")
