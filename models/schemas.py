@@ -153,6 +153,7 @@ class ItineraryGenerate(BaseModel):
     budget: float
     travelers: int
     interests: List[str]
+    specifications: Optional[str] = ""  # Additional trip specifications from user
     selected_hotel: Optional[Dict[str, Any]] = None  # Selected hotel information
 
 class ItineraryResponse(BaseModel):

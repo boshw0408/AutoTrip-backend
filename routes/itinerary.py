@@ -36,8 +36,15 @@ async def generate_itinerary(request: ItineraryGenerate):
             duration=duration
         )
         
-        # Build user preferences including selected hotel and remaining budget
+        # Build user preferences including selected hotel, specifications, and remaining budget
         user_preferences = ""
+        
+        # Add user specifications if provided
+        if request.specifications and request.specifications.strip():
+            user_preferences += f"USER SPECIFICATIONS: {request.specifications}\n\n"
+            logger.info(f"User specifications: {request.specifications}")
+        
+        # Add hotel information if selected
         if request.selected_hotel:
             hotel_name = request.selected_hotel.get("name", "")
             hotel_address = request.selected_hotel.get("address", "")
@@ -47,7 +54,7 @@ async def generate_itinerary(request: ItineraryGenerate):
             hotel_total_cost = hotel_price * duration
             remaining_budget = request.budget - hotel_total_cost
             
-            user_preferences = f"""The user has selected hotel: {hotel_name} located at {hotel_address} (${hotel_price}/night).
+            user_preferences += f"""The user has selected hotel: {hotel_name} located at {hotel_address} (${hotel_price}/night).
 CRITICAL: You MUST include this exact hotel in the itinerary as the accommodation base. Do NOT choose a different hotel.
 IMPORTANT: The hotel cost is ${hotel_total_cost:.2f} total (${hotel_price}/night × {duration} nights).
 REMAINING BUDGET for meals, attractions, and transport: ${remaining_budget:.2f}.

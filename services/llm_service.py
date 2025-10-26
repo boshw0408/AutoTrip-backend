@@ -50,6 +50,10 @@ Plan a realistic 2-day itinerary that fits the user's:
 - Number of travelers: {travelers}
 - Preferences: {user_preferences}
 
+IMPORTANT: Pay special attention to any USER SPECIFICATIONS in the preferences section above.
+These specifications reflect specific requirements or preferences the user has explicitly stated.
+Incorporate these specifications throughout the itinerary generation process.
+
 Output must include:
 1. Ordered list of attractions for each day (up to 6 total)
 2. Restaurant and dessert spots (breakfast, lunch, dinner × 2 days)
