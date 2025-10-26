@@ -25,7 +25,13 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://travel-ai.vercel.app"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://travel-ai.vercel.app",
+        "https://autotripfrontend.vercel.app",
+        "https://autotripfrontend-ex8xqhwat-boshw0408s-projects.vercel.app",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Allow all Vercel preview deployments
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
