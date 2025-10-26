@@ -59,6 +59,52 @@ class PlaceResponse(BaseModel):
     photos: List[str]
     description: Optional[str]
 
+# Hotel Search Models
+class HotelSearchRequest(BaseModel):
+    destination: str
+    check_in: date
+    check_out: date
+    travelers: int
+    budget: float
+    interests: List[str] = []
+
+class HotelSearchResponse(BaseModel):
+    id: str
+    name: str
+    address: str
+    coordinates: Dict[str, float]
+    rating: float
+    amenities: List[str]
+    price_per_night: float
+    total_price: float
+    currency: str
+    available: bool
+    distance_from_center: str
+    photos: List[str]
+    description: str
+    check_in_time: str
+    check_out_time: str
+    cancellation_policy: str
+    source: str
+
+class HotelComparisonRequest(BaseModel):
+    hotel_ids: List[str]
+    check_in: date
+    check_out: date
+    travelers: int
+
+class HotelComparisonResponse(BaseModel):
+    hotels: List[HotelSearchResponse]
+    comparison_metrics: Dict[str, Any]
+
+class BudgetBreakdownResponse(BaseModel):
+    total_budget: float
+    accommodation_budget: float
+    per_night_budget: float
+    per_person_budget: float
+    budget_tiers: Dict[str, float]
+
+# Legacy models (keeping for backward compatibility)
 class HotelSearch(BaseModel):
     location: str
     check_in: Optional[date] = None
@@ -132,3 +178,40 @@ class AISummarizeResponse(BaseModel):
     summary: str
     highlights: List[str]
     recommendations: List[str]
+
+# Hotel Booking Models
+class GuestName(BaseModel):
+    title: str  # MR, MRS, MS, etc.
+    first_name: str
+    last_name: str
+
+class GuestContact(BaseModel):
+    email: str
+    phone: str
+
+class Guest(BaseModel):
+    name: GuestName
+    contact: GuestContact
+
+class PaymentCard(BaseModel):
+    vendor_code: str  # VI (Visa), CA (MasterCard), AX (American Express)
+    card_number: str
+    expiry_date: str  # YYYY-MM format
+    cvv: str
+
+class HotelBookingRequest(BaseModel):
+    offer_id: str
+    guests: List[Guest]
+    payment: PaymentCard
+
+class HotelBookingResponse(BaseModel):
+    booking_id: str
+    status: str
+    hotel_name: str
+    check_in: str
+    check_out: str
+    guests: List[Guest]
+    total_price: float
+    currency: str
+    confirmation_number: Optional[str] = None
+    booking_details: Dict[str, Any]
