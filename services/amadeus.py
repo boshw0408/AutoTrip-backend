@@ -225,8 +225,9 @@ class AmadeusService:
         """Get hotel ratings and sentiments"""
         endpoint = "/v2/e-reputation/hotel-sentiments"
         
+        # Limit to 10 hotels per request (Amadeus test API restriction)
         params = {
-            "hotelIds": ",".join(hotel_ids[:100])  # Max 100 hotels
+            "hotelIds": ",".join(hotel_ids[:10])
         }
         
         try:

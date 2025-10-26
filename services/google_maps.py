@@ -399,3 +399,53 @@ class GoogleMapsService:
         except Exception as e:
             print(f"Error getting map bounds: {e}")
             return None
+    
+    async def get_hotel_details_by_name(self, hotel_name: str, location: str) -> Optional[Dict[str, Any]]:
+        """Get hotel details including rating and photos from Google Places API"""
+        if not self.client:
+            return None
+        
+        try:
+            # Search for the hotel by name and location
+            places_result = self.client.places(query=f"{hotel_name} hotel {location}")
+            
+            if not places_result.get('results'):
+                return None
+            
+            # Get the first result
+            place = places_result['results'][0]
+            place_id = place['place_id']
+            
+            # Extract photos from the initial search result
+            photos = []
+            photo_refs = place.get('photos', [])
+            for photo_ref in photo_refs[:5]:  # Limit to 5 photos
+                photo_reference = photo_ref.get('photo_reference', '')
+                if photo_reference:
+                    # Generate Google Maps photo URL
+                    photo_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference={photo_reference}&key={settings.google_maps_api_key}"
+                    photos.append(photo_url)
+            
+            # Get detailed information
+            place_details = self.client.place(
+                place_id=place_id,
+                fields=['name', 'formatted_address', 'rating', 'geometry', 'price_level', 'place_id']
+            )
+            
+            if not place_details.get('result'):
+                return None
+            
+            result = place_details['result']
+            
+            return {
+                'rating': result.get('rating', 0.0),
+                'photos': photos,
+                'place_id': place_id,
+                'name': result.get('name', hotel_name),
+                'address': result.get('formatted_address', ''),
+                'location': result.get('geometry', {}).get('location', {})
+            }
+            
+        except Exception as e:
+            print(f"Error getting hotel details from Google Maps: {e}")
+            return None

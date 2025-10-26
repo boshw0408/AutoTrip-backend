@@ -66,9 +66,10 @@ def calculate_distance(loc1: Dict[str, float], loc2: Dict[str, float]) -> float:
     return R * c
 
 
-def transform_amadeus_offer_to_hotel(offer: Dict[str, Any], check_in: str = None, check_out: str = None, midpoint: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
+def transform_amadeus_offer_to_hotel(offer: Dict[str, Any], check_in: str = None, check_out: str = None, midpoint: Optional[Dict[str, float]] = None, google_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Transform Amadeus hotel offer to frontend-compatible format
+    Enriches with Google Maps data for ratings and photos
     """
     hotel_info = offer.get("hotel", {})
     best_offer = offer.get("offers", [{}])[0] if offer.get("offers") else {}
@@ -127,16 +128,33 @@ def transform_amadeus_offer_to_hotel(offer: Dict[str, Any], check_in: str = None
         distance_km = calculate_distance(midpoint, hotel_location)
         distance_from_midpoint = f"{distance_km:.1f} km"
     
+    # Get rating and photos from Google Maps data if available
+    hotel_id = hotel_info.get("hotelId", "")
+    rating = 0.0
+    photos = []
+    
+    if google_data:
+        rating = google_data.get("rating", 0.0)
+        photos = google_data.get("photos", [])
+    else:
+        # Fallback: no stars if no Google Maps data
+        rating = 0.0
+    
+    # Use Google Maps address if available, otherwise use coordinates
+    final_address = address
+    if google_data and google_data.get("address"):
+        final_address = google_data.get("address")
+    
     return {
-        "id": hotel_info.get("hotelId", ""),
+        "id": hotel_id,
         "name": hotel_info.get("name", "Unknown Hotel"),
-        "rating": 4.0,  # Amadeus doesn't provide rating in this endpoint
+        "rating": rating,
         "price": price_per_night,
         "price_per_night": price_per_night,
-        "address": address,
+        "address": final_address,
         "amenities": amenities,
-        "image": "",  # Amadeus doesn't provide images
-        "photos": [],
+        "image": photos[0] if photos else "",  # Use first photo as main image
+        "photos": photos,
         "distance": distance_from_midpoint or "",
         "distance_from_center": distance_from_midpoint or "",
         "available": offer.get("available", False),
@@ -215,15 +233,32 @@ async def search_hotels(search_request: HotelSearchRequest):
             )
             
             # Transform Amadeus offers to frontend-compatible format
-            transformed_hotels = [
-                transform_amadeus_offer_to_hotel(
+            # We'll fetch Google Maps data for each hotel
+            transformed_hotels = []
+            for offer in offers:
+                hotel_google_data = None
+                hotel_name = offer.get("hotel", {}).get("name", "")
+                
+                # Fetch rating and photos from Google Maps
+                if hotel_name:
+                    try:
+                        hotel_google_data = await google_maps_service.get_hotel_details_by_name(
+                            hotel_name=hotel_name,
+                            location=search_request.destination
+                        )
+                        if hotel_google_data:
+                            logger.info(f"Found Google Maps data for {hotel_name}")
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch Google Maps data for {hotel_name}: {str(e)}")
+                
+                transformed_hotel = transform_amadeus_offer_to_hotel(
                     offer, 
                     check_in=search_request.check_in, 
                     check_out=search_request.check_out,
-                    midpoint=midpoint
-                ) 
-                for offer in offers
-            ]
+                    midpoint=midpoint,
+                    google_data=hotel_google_data
+                )
+                transformed_hotels.append(transformed_hotel)
             
             all_hotels.extend(transformed_hotels)
             
